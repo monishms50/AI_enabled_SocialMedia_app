@@ -40,21 +40,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: null,
   });
 
-  // 🔥 LOAD AUTH STATE ON PAGE LOAD
+  // Load auth state on mount
   useEffect(() => {
     const saved = localStorage.getItem("highlightai_auth");
     if (saved) {
-      setState(JSON.parse(saved));
+      try {
+        const parsed = JSON.parse(saved);
+        console.log("Loaded auth from localStorage:", {
+          hasIdToken: !!parsed.idToken,
+          hasAccessToken: !!parsed.accessToken,
+          user: parsed.user,
+        });
+        setState(parsed);
+      } catch (err) {
+        console.error("Failed to parse auth from localStorage:", err);
+        localStorage.removeItem("highlightai_auth");
+      }
     }
   }, []);
 
-  // 🔥 SAVE AUTH STATE TO LOCALSTORAGE
+  // Save to localStorage whenever state changes
+  useEffect(() => {
+    if (state.accessToken) {
+      console.log("Saving auth to localStorage:", {
+        hasIdToken: !!state.idToken,
+        hasAccessToken: !!state.accessToken,
+        user: state.user,
+      });
+      localStorage.setItem("highlightai_auth", JSON.stringify(state));
+    }
+  }, [state]);
+
   const login: AuthContextValue["login"] = ({
     email,
     accessToken,
     refreshToken,
     idToken,
   }) => {
+    console.log("Login called with tokens:", {
+      hasIdToken: !!idToken,
+      hasAccessToken: !!accessToken,
+      email,
+    });
+
     const newState: AuthState = {
       accessToken,
       refreshToken,
@@ -62,11 +90,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: { email },
     };
 
-    localStorage.setItem("highlightai_auth", JSON.stringify(newState));
     setState(newState);
   };
 
   const logout = () => {
+    console.log("Logout called");
     localStorage.removeItem("highlightai_auth");
     setState({
       accessToken: null,
@@ -85,6 +113,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [state]
   );
+
+  // Debug log
+  useEffect(() => {
+    console.log("AuthContext value updated:", {
+      hasIdToken: !!value.idToken,
+      hasAccessToken: !!value.accessToken,
+      isAuthenticated: value.isAuthenticated,
+      user: value.user,
+    });
+  }, [value]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
