@@ -154,34 +154,36 @@ Resources:
 
 
   # API GATEWAY
-  ApiGateway:
-    Type: AWS::Serverless::Api
-    Properties:
-      Name: highlightai-api
-      StageName: dev
-      Cors:
-        AllowOrigin: "'*'"
-        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowCredentials: false
-      Auth:
-        DefaultAuthorizer: CognitoAuthorizer
-        Authorizers:
-          CognitoAuthorizer:
-            UserPoolArn: !GetAtt UserPool.Arn
-            Identity:
-              Header: Authorization
-      GatewayResponses:
-        DEFAULT_4XX:
-          ResponseParameters:
-            Headers:
-              Access-Control-Allow-Origin: "'*'"
-              Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        DEFAULT_5XX:
-          ResponseParameters:
-            Headers:
-              Access-Control-Allow-Origin: "'*'"
-              Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+ApiGateway:
+  Type: AWS::Serverless::Api
+  Properties:
+    Name: highlightai-api
+    StageName: dev
+    Cors:
+      AllowOrigin: "'*'"
+      AllowHeaders: "'*'"
+      AllowMethods: "'OPTIONS,GET,POST,PUT,DELETE'"
+    Auth:
+      DefaultAuthorizer: CognitoAuthorizer
+      AddDefaultAuthorizerToCorsPreflight: false   # <--- REQUIRED FIX
+      Authorizers:
+        CognitoAuthorizer:
+          UserPoolArn: !GetAtt UserPool.Arn
+          Identity:
+            Header: Authorization
+    GatewayResponses:
+      DEFAULT_4XX:
+        ResponseParameters:
+          Headers:
+            Access-Control-Allow-Origin: "'*'"
+            Access-Control-Allow-Headers: "'*'"
+            Access-Control-Allow-Methods: "'OPTIONS,GET,POST,PUT,DELETE'"
+      DEFAULT_5XX:
+        ResponseParameters:
+          Headers:
+            Access-Control-Allow-Origin: "'*'"
+            Access-Control-Allow-Headers: "'*'"
+            Access-Control-Allow-Methods: "'OPTIONS,GET,POST,PUT,DELETE'"
 
 
   # LAMBDA: SIGNUP
@@ -336,3 +338,4 @@ Outputs:
     Value: !Ref UploadQueue
     Export:
       Name: !Sub ${AWS::StackName}-UploadQueueUrl
+
