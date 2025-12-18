@@ -1,13 +1,14 @@
 import { gql } from "@apollo/client";
 
 /**
- * For now we reuse listVideos
- * Later you can replace with listVideosByUser(userId)
+ * Get videos for a specific user
  */
-export const LIST_VIDEOS_FOR_PROFILE = gql`
-  query ListVideosForProfile($limit: Int!) {
-    listVideos(limit: $limit) {
+export const GET_USER_VIDEOS = gql`
+  query GetUserVideos($userId: String!) {
+    getUserVideos(userId: $userId) {
       videoId
+      userId
+      userEmail
       filename
       status
       createdAt

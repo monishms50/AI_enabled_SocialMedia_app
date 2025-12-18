@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useVideoUpload } from "../hooks/useVideoUpload";
+import { useUploadAnalytics } from "../../analytics/hooks/useUploadAnalytics";
 
 const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
 const MAX_DURATION_SECONDS = 120; // 2 minutes
@@ -7,34 +9,94 @@ const MAX_DURATION_SECONDS = 120; // 2 minutes
 type Mode = "idle" | "record" | "preview";
 
 export default function UploadPage() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("idle");
   const [file, setFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
+  const [cameraReady, setCameraReady] = useState(false);
 
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
-  const recordVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraPreviewRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recordTimerRef = useRef<number | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
 
-  const { status, progress, error: uploadError, uploadVideo, reset } =
-    useVideoUpload();
+  const { status, progress, error: uploadError, uploadVideo, reset } = useVideoUpload();
+  
+  // 🔥 Analytics tracking
+  const uploadAnalytics = useUploadAnalytics();
 
-  // Cleanup media stream on unmount
+  // Start camera immediately when component mounts
   useEffect(() => {
+    startCamera();
+
     return () => {
-      stopRecordingInternal(true);
+      stopCamera();
       if (videoUrl) {
         URL.revokeObjectURL(videoUrl);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-redirect to profile after successful upload
+  useEffect(() => {
+    if (status === "success") {
+      const timer = setTimeout(() => {
+        navigate("/profile");
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [status, navigate]);
+
+  // Start camera stream (persistent across idle/record modes)
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user"
+        },
+        audio: true,
+      });
+
+      mediaStreamRef.current = stream;
+
+      if (cameraPreviewRef.current) {
+        cameraPreviewRef.current.srcObject = stream;
+        cameraPreviewRef.current.muted = true;
+        try {
+          await cameraPreviewRef.current.play();
+          setCameraReady(true);
+        } catch (playError) {
+          console.error("Failed to play camera preview:", playError);
+        }
+      }
+    } catch (err) {
+      console.error("Camera access error:", err);
+      setError("Could not access camera. Please check permissions.");
+      setCameraReady(false);
+    }
+  }
+
+  // Stop camera stream
+  function stopCamera() {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+    }
+
+    if (cameraPreviewRef.current) {
+      cameraPreviewRef.current.srcObject = null;
+    }
+
+    setCameraReady(false);
+  }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     setError(null);
@@ -55,6 +117,9 @@ export default function UploadPage() {
     setFile(selected);
     setVideoUrl(url);
     setMode("preview");
+
+    // Stop camera when showing uploaded file preview
+    stopCamera();
   }
 
   async function validateVideoFile(f: File): Promise<string | null> {
@@ -66,7 +131,6 @@ export default function UploadPage() {
       return "Video must be smaller than 200MB.";
     }
 
-    // Check duration using a temporary video element
     try {
       const duration = await getVideoDuration(f);
       if (duration > MAX_DURATION_SECONDS) {
@@ -97,25 +161,19 @@ export default function UploadPage() {
     });
   }
 
-  async function startRecording() {
+  // Start recording (camera already running)
+  function startRecording() {
+    if (!mediaStreamRef.current) {
+      setError("Camera not ready. Please wait or refresh the page.");
+      return;
+    }
+
     setError(null);
     reset();
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-
-      mediaStreamRef.current = stream;
-
-      if (recordVideoRef.current) {
-        recordVideoRef.current.srcObject = stream;
-        recordVideoRef.current.play().catch(() => {});
-      }
-
       chunksRef.current = [];
-      const recorder = new MediaRecorder(stream, {
+      const recorder = new MediaRecorder(mediaStreamRef.current, {
         mimeType: "video/webm",
       });
 
@@ -126,7 +184,6 @@ export default function UploadPage() {
       };
 
       recorder.onstop = async () => {
-        // Create Blob from chunks
         const blob = new Blob(chunksRef.current, { type: "video/webm" });
         chunksRef.current = [];
 
@@ -149,31 +206,32 @@ export default function UploadPage() {
         setFile(recordedFile);
         setVideoUrl(url);
         setMode("preview");
+
+        // Stop camera when showing recorded preview
+        stopCamera();
       };
 
       mediaRecorderRef.current = recorder;
       recorder.start();
-      // setIsRecording(true);
       setRecordSeconds(0);
       setMode("record");
 
-      // Timer
       recordTimerRef.current = window.setInterval(() => {
         setRecordSeconds((prev) => {
           const next = prev + 1;
           if (next >= MAX_DURATION_SECONDS) {
-            stopRecordingInternal(false);
+            stopRecording();
           }
           return next;
         });
       }, 1000);
     } catch (err) {
       console.error(err);
-      setError("Could not access camera. Please check permissions.");
+      setError("Failed to start recording. Please try again.");
     }
   }
 
-  function stopRecordingInternal(cancelOnly: boolean) {
+  function stopRecording() {
     if (recordTimerRef.current !== null) {
       window.clearInterval(recordTimerRef.current);
       recordTimerRef.current = null;
@@ -183,20 +241,7 @@ export default function UploadPage() {
       mediaRecorderRef.current.stop();
     }
 
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-      mediaStreamRef.current = null;
-    }
-
     setRecordSeconds(0);
-
-    if (cancelOnly) {
-      setMode("idle");
-    }
-  }
-
-  function stopRecording() {
-    stopRecordingInternal(false);
   }
 
   async function handleUpload() {
@@ -207,12 +252,33 @@ export default function UploadPage() {
 
     try {
       setError(null);
+      
+      // Get video duration for analytics
+      const duration = await getVideoDuration(file);
+      
+      // 🔥 Track upload start with analytics
+      const tempVideoId = `temp-${Date.now()}`;
+      uploadAnalytics.trackUploadStart(tempVideoId, file.size, duration);
+      
+      // Upload the video
       const { videoId } = await uploadVideo(file);
       console.log("Uploaded videoId:", videoId);
-      // You could redirect or show a nice toast here
+      
+      // 🔥 Track upload complete
+      uploadAnalytics.trackUploadComplete(videoId, file.size, duration);
+      
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || "Upload failed.");
+      const errorMessage = err?.message || "Upload failed.";
+      setError(errorMessage);
+      
+      // 🔥 Track upload failed
+      uploadAnalytics.trackUploadFailed(
+        "unknown",
+        file.size,
+        0,
+        errorMessage
+      );
     }
   }
 
@@ -225,6 +291,9 @@ export default function UploadPage() {
     reset();
     setError(null);
     setMode("idle");
+
+    // Restart camera for retake
+    startCamera();
   }
 
   return (
@@ -237,37 +306,49 @@ export default function UploadPage() {
           </p>
         </div>
 
-        {/* Error banner */}
         {error && (
           <div className="rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
         )}
 
-        {/* Card */}
         <div className="rounded-3xl border border-white/10 bg-white/5 shadow-xl shadow-black/50 backdrop-blur-2xl p-4 md:p-6 flex flex-col gap-4">
-          {/* Video area */}
           <div className="aspect-[9/16] w-full max-h-[480px] bg-black/70 rounded-2xl overflow-hidden flex items-center justify-center relative">
-            {/* Recording preview */}
-            {mode === "record" && (
+            
+            {/* Camera Preview (shown in idle and record modes) */}
+            {mode !== "preview" && (
               <>
                 <video
-                  ref={recordVideoRef}
+                  ref={cameraPreviewRef}
                   className="h-full w-full object-cover"
                   autoPlay
                   muted
                   playsInline
                 />
-                <div className="absolute top-3 left-3 flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-xs font-semibold text-red-200">
-                    Recording • {recordSeconds}s
-                  </span>
-                </div>
+                
+                {/* Recording indicator */}
+                {mode === "record" && (
+                  <div className="absolute top-3 left-3 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-xs font-semibold text-red-200">
+                      Recording • {recordSeconds}s
+                    </span>
+                  </div>
+                )}
+
+                {/* Loading indicator while camera initializes */}
+                {!cameraReady && mode === "idle" && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <div className="text-center">
+                      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-white border-r-transparent mb-2"></div>
+                      <p className="text-sm text-white">Starting camera...</p>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
-            {/* Preview video */}
+            {/* Recorded/Uploaded Video Preview */}
             {mode === "preview" && videoUrl && (
               <video
                 ref={videoPreviewRef}
@@ -276,31 +357,17 @@ export default function UploadPage() {
                 controls
               />
             )}
-
-            {/* Idle state placeholder */}
-            {mode === "idle" && (
-              <div className="flex flex-col items-center justify-center text-center px-6">
-                <div className="mb-3 text-5xl">🎥</div>
-                <p className="text-sm text-slate-200 font-medium">
-                  Capture your best moments
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Record a new clip or upload from your device. Max 2 minutes,
-                  under 200MB.
-                </p>
-              </div>
-            )}
           </div>
 
-          {/* Controls */}
           <div className="flex flex-col gap-3">
             {mode === "idle" && (
               <>
                 <button
                   onClick={startRecording}
-                  className="w-full rounded-full bg-gradient-to-r from-pink-500 via-red-500 to-orange-500 py-2.5 text-sm font-semibold text-white shadow-lg shadow-pink-500/40 hover:opacity-95 transition"
+                  disabled={!cameraReady}
+                  className="w-full rounded-full bg-gradient-to-r from-pink-500 via-red-500 to-orange-500 py-2.5 text-sm font-semibold text-white shadow-lg shadow-pink-500/40 hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
-                  Start Recording
+                  {cameraReady ? "Start Recording" : "Camera Loading..."}
                 </button>
 
                 <div className="flex items-center gap-3">
@@ -365,8 +432,7 @@ export default function UploadPage() {
 
                 {status === "success" && (
                   <p className="mt-2 text-xs text-emerald-300">
-                    Upload complete! Your clip will appear in the feed once
-                    processed.
+                    Upload complete! Redirecting to your profile...
                   </p>
                 )}
 
@@ -383,3 +449,45 @@ export default function UploadPage() {
     </div>
   );
 }
+
+
+/*
+## 📂 Complete File Structure
+
+Make sure you have this exact structure:
+
+src/features/analytics/
+├── api/
+│   └── analyticsApi.ts
+├── hooks/
+│   └── useUploadAnalytics.ts
+├── types/
+│   └── analytics.ts
+└── utils/
+    └── geolocation.ts
+
+src/features/upload/
+└── pages/
+    └── UploadPage.tsx
+
+
+## What This Does:
+
+1. **Location Tracking:** Captures user's location when upload page loads
+2. **Upload Start:** Tracks when user begins upload (with location)
+3. **Upload Complete:** Tracks successful upload with duration
+4. **Upload Failed:** Tracks failed uploads with error message
+5. **Console Logging:** All analytics events are logged to console
+6. **Non-blocking:** Analytics failures won't break the upload flow
+
+
+
+## Testing:
+
+Check your console logs. You should see:
+
+Location captured for upload: {latitude: ..., longitude: ..., accuracy: ...}
+Upload analytics sent: upload_start
+Upload analytics sent: upload_complete
+
+*/

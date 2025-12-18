@@ -1,33 +1,54 @@
 import { Link } from "react-router-dom";
-import { dbg } from "../../../shared/utils/debug";
+import type { ProfileVideo } from "../hooks/useProfile";
 
 export default function ProfileVideoGrid({
   videos,
 }: {
-  videos: any[];
+  videos: ProfileVideo[];
 }) {
-  dbg("PROFILE", "Rendering video grid", videos.length);
-
   if (!videos.length) {
     return (
-      <p className="text-sm text-slate-400">
-        No videos yet
-      </p>
+      <div className="text-center py-12">
+        <div className="text-6xl mb-4">🎥</div>
+        <p className="text-slate-400 text-sm">No videos yet</p>
+        <p className="text-slate-500 text-xs mt-2">
+          Upload your first highlight to get started
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="grid grid-cols-3 gap-2">
-      {videos.map((v) => (
+      {videos.map((video) => (
         <Link
-          key={v.videoId}
-          to={`/video/${v.videoId}`}
+          key={video.videoId}
+          to={`/video/${video.videoId}`}
+          className="group relative aspect-square overflow-hidden rounded-lg bg-slate-900"
         >
           <video
-            src={v.filename}
+            src={video.filename}
             muted
-            className="aspect-square object-cover rounded-lg"
+            className="h-full w-full object-cover transition group-hover:scale-105"
           />
+          
+          {/* Hover overlay with stats */}
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <div className="text-white text-xs space-y-1">
+              <div className="flex items-center gap-1">
+                <span>♥</span>
+                <span>{video.likeCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span>💬</span>
+                <span>{video.commentCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span>👁</span>
+                <span>{video.viewCount}</span>
+              </div>
+            </div>
+          </div>
         </Link>
       ))}
     </div>

@@ -13,6 +13,5 @@ export const routes = createBrowserRouter([
   { path: "/signup", element: <SignUpPage /> },
   { path: "/upload", element: <UploadPage /> },
   { path: "/confirm", element: <ConfirmSignUpPage /> },
-  { path: "/profile/:userId",element: <ProfilePage />},
+  { path: "/profile", element: <ProfilePage /> }, // Current user's profile only
 ]);
-*/

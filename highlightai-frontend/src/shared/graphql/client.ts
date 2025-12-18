@@ -2,7 +2,6 @@ import { ApolloClient, InMemoryCache, ApolloLink, HttpLink, split } from "@apoll
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient } from "graphql-ws";
 import { getMainDefinition } from "@apollo/client/utilities";
-import { map } from "rxjs/operators";
 
 /**
  * Simple debug logger for GraphQL operations
@@ -53,23 +52,22 @@ const debugLink = new ApolloLink((operation, forward) => {
     variables: operation.variables,
   });
 
-    return forward(operation).map((result) => {
+  return forward(operation).map((result) => {
     if (result.errors?.length) {
-        dbgError(
+      dbgError(
         "GRAPHQL",
         `❌ ${operation.operationName || "UnnamedOp"} GraphQL errors`,
         result.errors
-        );
+      );
     } else {
-        dbg(
+      dbg(
         "GRAPHQL",
         `✅ ${operation.operationName || "UnnamedOp"} response`,
         result.data
-        );
+      );
     }
     return result;
-    });
-
+  });
 });
 
 const httpLink = new HttpLink({
@@ -123,7 +121,7 @@ export const apolloClient = new ApolloClient({
         fields: {
           /**
            * Makes pagination + merging easier later.
-           * For now, we’ll handle merging in our hook, but this prepares you for Phase 2.
+           * For now, we'll handle merging in our hook, but this prepares you for Phase 2.
            */
           getFeed: {
             keyArgs: false, // treat different args as the same field (pagination)

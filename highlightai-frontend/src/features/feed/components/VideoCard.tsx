@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useSubscription } from "@apollo/client";
+import { useVideoAnalytics } from "../../analytics/hooks/useVideoAnalytics";
 import {
   LIKE_VIDEO,
   UNLIKE_VIDEO,
@@ -9,16 +10,12 @@ import {
 import type { FeedVideo } from "../hooks/useFeed";
 import { dbg, dbgError } from "../../../shared/utils/debug";
 
-/**
- * Video card
- * - Autoplay / pause
- * - Records views
- * - Like / unlike
- * - Subscribes to engagement updates
- */
 export default function VideoCard({ video }: { video: FeedVideo }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const viewedRef = useRef(false);
+
+  // 🔥 Add analytics tracking
+  const analytics = useVideoAnalytics(video.videoId, videoRef.current);
 
   const [liked, setLiked] = useState(false);
   const [stats, setStats] = useState({
@@ -114,6 +111,12 @@ export default function VideoCard({ video }: { video: FeedVideo }) {
         <div>
           <div className="font-semibold">{video.videoId}</div>
           <div className="text-xs text-slate-400">{video.status}</div>
+          {/* 🔥 Show analytics data */}
+          <div className="text-xs text-slate-500 mt-1">
+            Session: {analytics.sessionId.substring(0, 8)}... | 
+            Watches: {analytics.watchCount} | 
+            Pauses: {analytics.pauseCount}
+          </div>
         </div>
 
         <div className="flex gap-3 items-center">
