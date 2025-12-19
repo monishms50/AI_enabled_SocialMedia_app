@@ -6,6 +6,7 @@ import { dbg, dbgError } from "../../../shared/utils/debug";
 export type FeedVideo = {
   videoId: string;
   filename: string;
+  s3Key?: string;  // ✅ Added s3Key
   status: string;
   createdAt?: number;
   likeCount: number;
@@ -41,6 +42,7 @@ export function useFeed() {
     return raw.map((v: any) => ({
       videoId: String(v.videoId),
       filename: String(v.filename),
+      s3Key: v.s3Key,  // ✅ Include s3Key
       status: String(v.status),
       createdAt: v.createdAt,
       likeCount: Number(v.likeCount ?? 0),

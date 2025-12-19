@@ -28,6 +28,24 @@ export default function VideoCard({ video }: { video: FeedVideo }) {
   const [unlikeVideo] = useMutation(UNLIKE_VIDEO);
   const [recordView] = useMutation(RECORD_VIEW);
 
+  // ✅ Helper function to get proper S3 URL
+  const getVideoUrl = (video: FeedVideo) => {
+    // If filename is already a full URL, use it
+    if (video.filename?.startsWith('http')) {
+      return video.filename;
+    }
+    
+    // Build S3 URL from s3Key if available
+    if (video.s3Key) {
+      const bucket = 'highlightai-raw-videos-642570498207';
+      const region = 'us-east-1';
+      return `https://${bucket}.s3.${region}.amazonaws.com/${video.s3Key}`;
+    }
+    
+    // Fallback: return filename as-is
+    return video.filename || '';
+  };
+
   useSubscription(ON_ENGAGEMENT_UPDATE, {
     variables: { videoId: video.videoId },
     onData: ({ data }) => {
@@ -100,7 +118,7 @@ export default function VideoCard({ video }: { video: FeedVideo }) {
     <div className="rounded-3xl overflow-hidden bg-black border border-white/10">
       <video
         ref={videoRef}
-        src={video.filename}
+        src={getVideoUrl(video)}
         muted
         loop
         playsInline
@@ -121,10 +139,10 @@ export default function VideoCard({ video }: { video: FeedVideo }) {
 
         <div className="flex gap-3 items-center">
           <button onClick={toggleLike}>
-            {liked ? "♥" : "♡"} {stats.likeCount}
+            {liked ? "♥" : "♡"} {stats.likeCount || 0}
           </button>
-          <span>💬 {stats.commentCount}</span>
-          <span>👁 {stats.viewCount}</span>
+          <span>💬 {stats.commentCount || 0}</span>
+          <span>👁 {stats.viewCount || 0}</span>
         </div>
       </div>
     </div>

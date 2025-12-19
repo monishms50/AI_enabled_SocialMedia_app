@@ -6,6 +6,24 @@ export default function ProfileVideoGrid({
 }: {
   videos: ProfileVideo[];
 }) {
+  // Helper function to get proper S3 URL
+  const getVideoUrl = (video: ProfileVideo) => {
+    // If filename is already a full URL, use it
+    if (video.filename?.startsWith('http')) {
+      return video.filename;
+    }
+    
+    // Build S3 URL from s3Key if available
+    if (video.s3Key) {
+      const bucket = 'highlightai-raw-videos-642570498207';
+      const region = 'us-east-1';
+      return `https://${bucket}.s3.${region}.amazonaws.com/${video.s3Key}`;
+    }
+    
+    // Fallback: return filename as-is (will fail to load, but won't crash)
+    return video.filename || '';
+  };
+
   if (!videos.length) {
     return (
       <div className="text-center py-12">
@@ -27,7 +45,7 @@ export default function ProfileVideoGrid({
           className="group relative aspect-square overflow-hidden rounded-lg bg-slate-900"
         >
           <video
-            src={video.filename}
+            src={getVideoUrl(video)}
             muted
             className="h-full w-full object-cover transition group-hover:scale-105"
           />
@@ -37,15 +55,15 @@ export default function ProfileVideoGrid({
             <div className="text-white text-xs space-y-1">
               <div className="flex items-center gap-1">
                 <span>♥</span>
-                <span>{video.likeCount}</span>
+                <span>{video.likeCount || 0}</span>
               </div>
               <div className="flex items-center gap-1">
                 <span>💬</span>
-                <span>{video.commentCount}</span>
+                <span>{video.commentCount || 0}</span>
               </div>
               <div className="flex items-center gap-1">
                 <span>👁</span>
-                <span>{video.viewCount}</span>
+                <span>{video.viewCount || 0}</span>
               </div>
             </div>
           </div>

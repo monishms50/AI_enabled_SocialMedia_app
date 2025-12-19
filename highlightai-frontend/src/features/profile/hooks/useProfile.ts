@@ -7,6 +7,7 @@ export interface ProfileVideo {
   userId: string;
   userEmail?: string;
   filename: string;
+  s3Key?: string;  // ✅ Add this field
   status: string;
   createdAt?: number;
   likeCount: number;
@@ -21,7 +22,7 @@ export function useProfile(userId: string) {
   const { data, loading, error, refetch } = useQuery(GET_USER_VIDEOS, {
     variables: { userId },
     fetchPolicy: "cache-and-network",
-    skip: !userId, // Don't run query if userId is empty
+    skip: !userId,
   });
 
   if (error) {
@@ -33,6 +34,7 @@ export function useProfile(userId: string) {
     userId: String(v.userId),
     userEmail: v.userEmail,
     filename: String(v.filename),
+    s3Key: v.s3Key,  // ✅ Include s3Key
     status: String(v.status),
     createdAt: v.createdAt,
     likeCount: Number(v.likeCount ?? 0),

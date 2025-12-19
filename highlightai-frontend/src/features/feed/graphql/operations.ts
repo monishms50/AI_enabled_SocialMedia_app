@@ -11,6 +11,7 @@ export const LIST_VIDEOS = gql`
     listVideos(limit: $limit) {
       videoId
       filename
+      s3Key
       status
       createdAt
       likeCount

@@ -10,6 +10,7 @@ export const GET_USER_VIDEOS = gql`
       userId
       userEmail
       filename
+      s3Key
       status
       createdAt
       likeCount
