@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useSubscription } from "@apollo/client";
-import { useVideoAnalytics } from "../../analytics/hooks/useVideoAnalytics";
+// import { useVideoAnalytics } from "../../analytics/hooks/useVideoAnalytics";
 import {
   LIKE_VIDEO,
   UNLIKE_VIDEO,
@@ -14,9 +14,10 @@ export default function VideoCard({ video }: { video: FeedVideo }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const viewedRef = useRef(false);
 
-  // 🔥 Add analytics tracking
-  const analytics = useVideoAnalytics(video.videoId, videoRef.current);
-
+  // 🔥 Add analytics tracking (disabled temporarily due to CORS)
+  // const analytics = useVideoAnalytics(video.videoId, videoRef.current);
+  
+  const [isMuted, setIsMuted] = useState(true);
   const [liked, setLiked] = useState(false);
   const [stats, setStats] = useState({
     likeCount: video.likeCount,
@@ -115,26 +116,36 @@ export default function VideoCard({ video }: { video: FeedVideo }) {
   }
 
   return (
-    <div className="rounded-3xl overflow-hidden bg-black border border-white/10">
+    <div className="rounded-3xl overflow-hidden bg-black border border-white/10 relative">
       <video
         ref={videoRef}
         src={getVideoUrl(video)}
-        muted
+        muted={isMuted}
         loop
         playsInline
-        className="w-full aspect-[9/16] object-cover"
+        className="w-full aspect-[9/16] object-cover cursor-pointer"
+        onClick={() => setIsMuted(!isMuted)}
       />
+      
+      {/* Mute indicator */}
+      {isMuted && (
+        <div className="absolute top-4 right-4 bg-black/70 text-white px-3 py-1.5 rounded-full text-xs flex items-center gap-1 pointer-events-none">
+          <span>🔇</span>
+          <span>Tap to unmute</span>
+        </div>
+      )}
 
       <div className="p-3 flex justify-between items-center text-white text-sm">
         <div>
           <div className="font-semibold">{video.videoId}</div>
           <div className="text-xs text-slate-400">{video.status}</div>
-          {/* 🔥 Show analytics data */}
+          {/* 🔥 Analytics disabled temporarily due to CORS
           <div className="text-xs text-slate-500 mt-1">
             Session: {analytics.sessionId.substring(0, 8)}... | 
             Watches: {analytics.watchCount} | 
             Pauses: {analytics.pauseCount}
           </div>
+          */}
         </div>
 
         <div className="flex gap-3 items-center">

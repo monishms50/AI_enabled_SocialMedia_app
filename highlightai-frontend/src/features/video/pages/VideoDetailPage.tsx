@@ -12,7 +12,7 @@ import {
 
 // Query to get single video details
 const GET_VIDEO = gql`
-  query GetVideo($videoId: String!) {
+  query GetVideo($videoId: ID!) {
     getVideo(videoId: $videoId) {
       videoId
       userId
